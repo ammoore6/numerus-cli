@@ -1,0 +1,7 @@
+[package]
+name = "numerus"
+version = "0.1.0"
+edition = "2021"
+authors = ["ammoore6"]
+description = "A validating parser and pretty printer for roman numerals"
+license = "MIT"
