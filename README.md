@@ -62,6 +62,10 @@ cargo build --release
 ./target/release/numerus parse MCMXCIV
 ```
 
+`cargo test` runs both the unit tests in `src/roman.rs` and the integration
+tests in `tests/cli.rs`, which build the binary and shell out to it to check
+the actual command-line behavior (exit codes, stdout/stderr, `--json`).
+
 ## How validation works
 
 Rather than hand-coding every repetition and ordering rule (no more than
