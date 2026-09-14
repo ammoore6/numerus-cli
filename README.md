@@ -53,6 +53,20 @@ Only values 1 through 3999 have a standard roman numeral form (there's no
 symbol for zero, and repeating `M` more than three times isn't canonical),
 so both commands reject anything outside that range.
 
+Pass `-` in place of the operand to read one numeral or number per line
+from stdin instead:
+
+```
+$ printf 'XIV\nIX\nIIII\n' | numerus parse -
+XIV = 14
+IX = 9
+error: 'IIII' is not a canonical roman numeral (did you mean 'IV'?)
+```
+
+Blank lines are skipped. A failing line doesn't stop the batch, but the
+process still exits nonzero if any line failed, so `numerus parse - < file`
+is safe to use as a validity check over a whole file at once.
+
 ## Building
 
 Requires a stable Rust toolchain. No external dependencies.

@@ -1,10 +1,28 @@
-use std::process::{Command, Output};
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 
 fn numerus(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_numerus"))
         .args(args)
         .output()
         .expect("failed to run numerus binary")
+}
+
+fn numerus_with_stdin(args: &[&str], input: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_numerus"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn numerus binary");
+    child
+        .stdin
+        .take()
+        .expect("child stdin was not piped")
+        .write_all(input.as_bytes())
+        .expect("failed to write to child stdin");
+    child.wait_with_output().expect("failed to wait on child")
 }
 
 fn stdout(out: &Output) -> String {
@@ -88,4 +106,28 @@ fn help_flag_prints_usage_and_succeeds() {
     let out = numerus(&["--help"]);
     assert!(out.status.success());
     assert!(stdout(&out).contains("usage:"));
+}
+
+#[test]
+fn parse_batch_reads_one_numeral_per_stdin_line() {
+    let out = numerus_with_stdin(&["parse", "-"], "XIV\nIX\nMCMXCIV\n");
+    assert!(out.status.success());
+    assert_eq!(stdout(&out), "XIV = 14\nIX = 9\nMCMXCIV = 1994\n");
+}
+
+#[test]
+fn parse_batch_skips_blank_lines_and_keeps_going_after_a_failure() {
+    let out = numerus_with_stdin(&["parse", "-"], "XIV\n\nIIII\nIX\n");
+    assert!(!out.status.success());
+    assert_eq!(stdout(&out), "XIV = 14\nIX = 9\n");
+    assert!(stderr(&out).contains("did you mean 'IV'?"));
+}
+
+#[test]
+fn format_batch_reads_one_number_per_stdin_line_as_json() {
+    let out = numerus_with_stdin(&["format", "-", "--json"], "1994\n4000\n");
+    assert!(!out.status.success());
+    let text = stdout(&out);
+    assert!(text.contains("\"input\":\"1994\",\"valid\":true,\"roman\":\"MCMXCIV\""));
+    assert!(text.contains("\"input\":\"4000\",\"valid\":false"));
 }

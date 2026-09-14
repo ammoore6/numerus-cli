@@ -2,6 +2,7 @@ mod roman;
 
 use roman::RomanError;
 use std::env;
+use std::io::{self, BufRead};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -43,7 +44,53 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     }
 }
 
-fn run_parse(input: &str, json: bool) -> ExitCode {
+fn run_parse(operand: &str, json: bool) -> ExitCode {
+    run_over_inputs(operand, |input| parse_one(input, json))
+}
+
+fn run_format(operand: &str, json: bool) -> ExitCode {
+    run_over_inputs(operand, |input| format_one(input, json))
+}
+
+/// Runs `process` over a single operand, or, when the operand is `-`, over
+/// every non-blank line read from stdin. Batch mode keeps going after a
+/// failed line (so one bad row in a large input doesn't hide the rest of
+/// the results) but still reports overall failure if any line failed.
+fn run_over_inputs(operand: &str, mut process: impl FnMut(&str) -> bool) -> ExitCode {
+    if operand != "-" {
+        return if process(operand) {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+
+    let stdin = io::stdin();
+    let mut all_ok = true;
+    for line in stdin.lock().lines() {
+        let line = match line {
+            Ok(line) => line,
+            Err(e) => {
+                eprintln!("error reading stdin: {}", e);
+                return ExitCode::FAILURE;
+            }
+        };
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if !process(trimmed) {
+            all_ok = false;
+        }
+    }
+    if all_ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+fn parse_one(input: &str, json: bool) -> bool {
     match roman::parse(input) {
         Ok(value) => {
             if json {
@@ -55,7 +102,7 @@ fn run_parse(input: &str, json: bool) -> ExitCode {
             } else {
                 println!("{} = {}", input, value);
             }
-            ExitCode::SUCCESS
+            true
         }
         Err(e) => {
             if json {
@@ -67,12 +114,12 @@ fn run_parse(input: &str, json: bool) -> ExitCode {
             } else {
                 eprintln!("error: {}", e);
             }
-            ExitCode::FAILURE
+            false
         }
     }
 }
 
-fn run_format(input: &str, json: bool) -> ExitCode {
+fn format_one(input: &str, json: bool) -> bool {
     let result = parse_number(input).and_then(roman::to_roman);
     match result {
         Ok(numeral) => {
@@ -85,7 +132,7 @@ fn run_format(input: &str, json: bool) -> ExitCode {
             } else {
                 println!("{} = {}", input, numeral);
             }
-            ExitCode::SUCCESS
+            true
         }
         Err(e) => {
             if json {
@@ -97,7 +144,7 @@ fn run_format(input: &str, json: bool) -> ExitCode {
             } else {
                 eprintln!("error: {}", e);
             }
-            ExitCode::FAILURE
+            false
         }
     }
 }
@@ -134,6 +181,9 @@ fn usage_error() -> String {
 }
 
 fn usage_text() -> String {
-    "usage:\n  numerus parse <NUMERAL> [--json]\n  numerus format <NUMBER> [--json]\n\nexamples:\n  numerus parse XIV\n  numerus format 1994 --json"
+    "usage:\n  numerus parse <NUMERAL|-> [--json]\n  numerus format <NUMBER|-> [--json]\n\n\
+     examples:\n  numerus parse XIV\n  numerus format 1994 --json\n\n\
+     use '-' in place of the operand to read one numeral or number per line\n\
+     from stdin; the exit code is nonzero if any line fails"
         .to_string()
 }
