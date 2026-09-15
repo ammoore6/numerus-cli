@@ -124,6 +124,27 @@ fn parse_batch_skips_blank_lines_and_keeps_going_after_a_failure() {
 }
 
 #[test]
+fn lenient_accepts_legacy_forms_that_strict_rejects() {
+    let out = numerus(&["parse", "IIII", "--lenient"]);
+    assert!(out.status.success());
+    assert_eq!(stdout(&out), "IIII = 4\n");
+}
+
+#[test]
+fn lenient_still_rejects_invalid_characters() {
+    let out = numerus(&["parse", "IIXZ", "--lenient"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("invalid character 'Z'"));
+}
+
+#[test]
+fn lenient_flag_is_rejected_for_format() {
+    let out = numerus(&["format", "1994", "--lenient"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("--lenient only applies to 'parse'"));
+}
+
+#[test]
 fn format_batch_reads_one_number_per_stdin_line_as_json() {
     let out = numerus_with_stdin(&["format", "-", "--json"], "1994\n4000\n");
     assert!(!out.status.success());

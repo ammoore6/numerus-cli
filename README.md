@@ -67,6 +67,23 @@ Blank lines are skipped. A failing line doesn't stop the batch, but the
 process still exits nonzero if any line failed, so `numerus parse - < file`
 is safe to use as a validity check over a whole file at once.
 
+Some older documents use non-canonical numerals like `IIII` or `VV`. Pass
+`--lenient` to `parse` to accept those: it still sums the numeral the usual
+way, it just skips the check that the input is the *only* correct spelling
+of its value.
+
+```
+$ numerus parse IIII
+error: 'IIII' is not a canonical roman numeral (did you mean 'IV'?)
+
+$ numerus parse IIII --lenient
+IIII = 4
+```
+
+`--lenient` still rejects invalid characters and out-of-range values, and
+it has no effect on `format`, since formatting always produces the
+canonical spelling.
+
 ## Building
 
 Requires a stable Rust toolchain. No external dependencies.

@@ -49,13 +49,11 @@ fn symbol_value(c: char) -> Option<u32> {
     }
 }
 
-/// Parses a roman numeral, accepting only its canonical form.
-///
-/// Rather than hand-coding every repetition and ordering rule, this sums the
-/// numeral the standard way and then re-renders that sum with `to_roman`.
-/// Any input that isn't already the canonical spelling of its own value
-/// (e.g. "IIII", "VV", "IXIV") fails to round-trip and is rejected.
-pub fn parse(input: &str) -> Result<u32, RomanError> {
+/// Sums the symbol values of a numeral using the standard left-to-right
+/// rule (a smaller symbol immediately before a larger one is subtracted
+/// rather than added). This is the same summation both `parse` and
+/// `parse_lenient` build on; it makes no judgment about canonicality.
+fn sum_symbols(input: &str) -> Result<u32, RomanError> {
     if input.is_empty() {
         return Err(RomanError::Empty);
     }
@@ -83,6 +81,17 @@ pub fn parse(input: &str) -> Result<u32, RomanError> {
         i += 1;
     }
 
+    Ok(total)
+}
+
+/// Parses a roman numeral, accepting only its canonical form.
+///
+/// Rather than hand-coding every repetition and ordering rule, this sums the
+/// numeral the standard way and then re-renders that sum with `to_roman`.
+/// Any input that isn't already the canonical spelling of its own value
+/// (e.g. "IIII", "VV", "IXIV") fails to round-trip and is rejected.
+pub fn parse(input: &str) -> Result<u32, RomanError> {
+    let total = sum_symbols(input)?;
     if total < MIN_VALUE || total > MAX_VALUE {
         return Err(RomanError::OutOfRange(total as i64));
     }
@@ -96,6 +105,18 @@ pub fn parse(input: &str) -> Result<u32, RomanError> {
             canonical,
         })
     }
+}
+
+/// Parses a roman numeral the same way `parse` does, but skips the
+/// canonical round-trip check. This accepts legacy forms like "IIII" or
+/// "VV" that sum to a valid value even though nobody would write them
+/// that way today.
+pub fn parse_lenient(input: &str) -> Result<u32, RomanError> {
+    let total = sum_symbols(input)?;
+    if total < MIN_VALUE || total > MAX_VALUE {
+        return Err(RomanError::OutOfRange(total as i64));
+    }
+    Ok(total)
 }
 
 /// Renders an integer in the range 1..=3999 as a canonical roman numeral.
@@ -168,5 +189,28 @@ mod tests {
         assert!(matches!(parse("MMMM"), Err(RomanError::OutOfRange(4000))));
         assert!(to_roman(0).is_err());
         assert!(to_roman(4000).is_err());
+    }
+
+    #[test]
+    fn lenient_accepts_legacy_forms_strict_rejects() {
+        assert_eq!(parse_lenient("IIII").unwrap(), 4);
+        assert_eq!(parse_lenient("VV").unwrap(), 10);
+        assert_eq!(parse_lenient("IC").unwrap(), 99);
+        assert!(parse("IIII").is_err());
+        assert!(parse("VV").is_err());
+        assert!(parse("IC").is_err());
+    }
+
+    #[test]
+    fn lenient_still_accepts_canonical_forms() {
+        assert_eq!(parse_lenient("XIV").unwrap(), 14);
+        assert_eq!(parse_lenient("MCMXCIV").unwrap(), 1994);
+    }
+
+    #[test]
+    fn lenient_still_rejects_bad_characters_and_ranges() {
+        assert!(matches!(parse_lenient(""), Err(RomanError::Empty)));
+        assert!(matches!(parse_lenient("xiv"), Err(RomanError::InvalidChar('x', 0))));
+        assert!(matches!(parse_lenient("MMMM"), Err(RomanError::OutOfRange(4000))));
     }
 }
